@@ -1,5 +1,7 @@
 package game
 
+import rl "vendor:raylib"
+
 @(export)
 game_update :: proc() -> bool {
 	update()
