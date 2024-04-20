@@ -10,6 +10,7 @@ log.txt
 *.dylib
 *.so
 *.dSYM
+*.a
 linux
 
 build/

@@ -52,6 +52,14 @@ FileDialogType :: enum {
 	Exit,
 }
 
+PackerSettings :: struct {
+	pixel_padding_x:    f32,
+	pixel_padding_y:    f32,
+	padding_enabled:    bool,
+	fix_pixel_bleeding: bool,
+	output_json:        bool,
+	output_odin:        bool,
+}
 
 FILE_DIALOG_SIZE :: 1000
 GameMemory :: struct {
@@ -73,6 +81,8 @@ GameMemory :: struct {
 	source_files_to_pack:           []string,
 	// What type of file dialog to open
 	source_location_type:           FileDialogType,
+	// Packer settings
+	packer_settings:                PackerSettings,
 }
 
 g_mem: ^GameMemory
@@ -167,40 +177,52 @@ draw_screen_target :: proc() {
 }
 draw_atlas_settings_and_preview :: proc() {
 	left_half_rect := rl.Rectangle {
-		0,
-		0,
-		auto_cast g_mem.window_info.width_scaled / 2,
-		auto_cast g_mem.window_info.height_scaled,
+		x      = 0,
+		y      = 0,
+		width  = auto_cast g_mem.window_info.width_scaled / 3,
+		height = auto_cast g_mem.window_info.height_scaled,
 	}
 	right_half_rect := rl.Rectangle {
-		auto_cast g_mem.window_info.width_scaled / 2,
-		0,
-		auto_cast g_mem.window_info.width_scaled / 2,
-		auto_cast g_mem.window_info.height_scaled,
+		x      = auto_cast g_mem.window_info.width_scaled / 3,
+		y      = 0,
+		width  = auto_cast (g_mem.window_info.width_scaled / 3) * 2,
+		height = auto_cast g_mem.window_info.height_scaled,
 	}
 	rl.DrawRectangleRec(left_half_rect, rl.WHITE)
 	rl.DrawRectangleRec(right_half_rect, rl.MAROON)
 
-	// font := rl.GuiGetFont()
-	// text_size := rl.MeasureTextEx(font, "Atlas Packer Settings", auto_cast font.baseSize / scaling, 1)
-
-        small_offset := 10 * scaling
+	small_offset := 10 * scaling
+	big_offset := 30 * scaling
 	elements_height: f32 = 0
-	rl.GuiLabel(
-		rl.Rectangle{x = small_offset, y = 0, width = 100 * scaling, height = 25 * scaling},
-		"Atlas Packer Settings",
-	)
+
+	rl.GuiPanel(left_half_rect, "Atlas Settings")
 	elements_height += 25 * scaling
+
 	rl.GuiLine({y = elements_height, width = left_half_rect.width}, "Packer Settings")
 	elements_height += small_offset
-	rl.GuiLine({y = elements_height, width = left_half_rect.width}, "Save Settings")
-	elements_height += small_offset
+
 	if rl.GuiButton(
 		    {
 			   x = small_offset,
 			   y = elements_height,
 			   width = left_half_rect.width / 2 - small_offset * 2,
-			   height = 25 * scaling,
+			   height = small_offset,
+		   },
+		   "Pack",
+	   ) {
+
+	}
+	elements_height += small_offset * 2
+
+	rl.GuiLine({y = elements_height, width = left_half_rect.width}, "Save Settings")
+	elements_height += small_offset
+
+	if rl.GuiButton(
+		    {
+			   x = small_offset,
+			   y = elements_height,
+			   width = left_half_rect.width / 2 - small_offset * 2,
+			   height = small_offset,
 		   },
 		   "Save",
 	   ) {
@@ -211,12 +233,26 @@ draw_atlas_settings_and_preview :: proc() {
 			   x = left_half_rect.width / 2,
 			   y = elements_height,
 			   width = left_half_rect.width / 2 - small_offset,
-			   height = 25 * scaling,
+			   height = small_offset,
 		   },
 		   "Save To...",
 	   ) {
 
 	}
+
+	elements_height = 0
+	rl.GuiPanel(right_half_rect, "Atlas Preview")
+	short_edge := min(
+		right_half_rect.height - big_offset * 2,
+		right_half_rect.width - big_offset * 2,
+	)
+	preview_rect := rl.Rectangle {
+		x      = right_half_rect.x + big_offset,
+		y      = right_half_rect.y + big_offset,
+		width  = short_edge,
+		height = short_edge,
+	}
+	rl.GuiDummyRec(preview_rect, "PREVIEW")
 }
 
 open_file_dialog_and_store_output_paths :: proc() {
