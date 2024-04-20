@@ -12,8 +12,9 @@ game_update :: proc() -> bool {
 @(export)
 game_init_window :: proc() {
 	rl.SetConfigFlags({.WINDOW_RESIZABLE})
-	rl.InitWindow(1280, 720, "YAAP - Yet Another Atlas Packer, Powered by Raylib & Odin")
+	rl.InitWindow(1400, 800, "YAAP - Yet Another Atlas Packer, Powered by Raylib & Odin")
 	rl.SetWindowPosition(200, 200)
+	rl.SetWindowMinSize(1400, 800)
 }
 
 @(export)
@@ -35,8 +36,10 @@ game_init :: proc() {
 		h = 720,
 	}
 
+	g_mem.atlas_render_texture_target = rl.LoadRenderTexture(2048, 2048)
+
 	rl.SetTargetFPS(rl.GetMonitorRefreshRate(current_monitor))
-        rl.GuiLoadStyle("./styles/style_candy.rgs")
+	rl.GuiLoadStyle("./styles/style_candy.rgs")
 }
 
 @(export)
@@ -62,7 +65,7 @@ game_memory_size :: proc() -> int {
 @(export)
 game_hot_reloaded :: proc(mem: rawptr) {
 	g_mem = (^GameMemory)(mem)
-        rl.GuiLoadStyle("./styles/style_candy.rgs")
+	rl.GuiLoadStyle("./styles/style_candy.rgs")
 }
 
 @(export)

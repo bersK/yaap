@@ -53,12 +53,14 @@ FileDialogType :: enum {
 }
 
 PackerSettings :: struct {
-	pixel_padding_x:    f32,
-	pixel_padding_y:    f32,
-	padding_enabled:    bool,
-	fix_pixel_bleeding: bool,
-	output_json:        bool,
-	output_odin:        bool,
+	pixel_padding_x_int: i32,
+	pixel_padding_x:     f32,
+	pixel_padding_y_int: i32,
+	pixel_padding_y:     f32,
+	padding_enabled:     bool,
+	fix_pixel_bleeding:  bool,
+	output_json:         bool,
+	output_odin:         bool,
 }
 
 FILE_DIALOG_SIZE :: 1000
@@ -83,6 +85,8 @@ GameMemory :: struct {
 	source_location_type:           FileDialogType,
 	// Packer settings
 	packer_settings:                PackerSettings,
+	atlas_render_texture_target:    rl.RenderTexture2D,
+	atlas_render:                   bool,
 }
 
 g_mem: ^GameMemory
@@ -127,7 +131,9 @@ draw :: proc() {
 
 	draw_screen_ui()
 
-	draw_screen_target()
+	if g_mem.atlas_render {
+		draw_screen_target()
+	}
 }
 
 update_screen :: proc() {
@@ -171,10 +177,15 @@ draw_screen_ui :: proc() {
 }
 
 draw_screen_target :: proc() {
-	rl.BeginMode2D(ui_camera())
-	defer rl.EndMode2D()
+	rl.BeginTextureMode(g_mem.atlas_render_texture_target)
+	defer rl.EndTextureMode()
 
+	rl.ClearBackground(rl.WHITE)
+	rl.DrawCircle(100, 100, 50, rl.GREEN)
+
+	g_mem.atlas_render = false
 }
+
 draw_atlas_settings_and_preview :: proc() {
 	left_half_rect := rl.Rectangle {
 		x      = 0,
@@ -198,7 +209,79 @@ draw_atlas_settings_and_preview :: proc() {
 	rl.GuiPanel(left_half_rect, "Atlas Settings")
 	elements_height += 25 * scaling
 
-	rl.GuiLine({y = elements_height, width = left_half_rect.width}, "Packer Settings")
+	rl.GuiLine({y = elements_height, width = left_half_rect.width}, "General Settings")
+	elements_height += small_offset
+
+	rl.GuiCheckBox(
+		{x = small_offset, y = elements_height, width = small_offset, height = small_offset},
+		"Fix pixel bleed",
+		&g_mem.packer_settings.padding_enabled,
+	)
+	elements_height += small_offset * 2
+
+	rl.GuiLine({y = elements_height, width = left_half_rect.width}, "Padding Settings")
+	elements_height += small_offset
+
+	rl.GuiCheckBox(
+		{x = small_offset, y = elements_height, width = small_offset, height = small_offset},
+		"Enable padding",
+		&g_mem.packer_settings.fix_pixel_bleeding,
+	)
+	elements_height += small_offset * 2
+
+	@(static)
+	spinner_edit_mode: bool
+	if (rl.GuiSpinner(
+			    {
+				   x = small_offset,
+				   y = elements_height,
+				   width = big_offset * 2,
+				   height = small_offset,
+			   },
+			   "",
+			   &g_mem.packer_settings.pixel_padding_x_int,
+			   0,
+			   10,
+			   spinner_edit_mode,
+		   )) >
+	   0 {spinner_edit_mode = !spinner_edit_mode}
+	rl.GuiLabel(
+		 {
+			x = (small_offset * 2) + big_offset * 2,
+			y = elements_height,
+			width = big_offset,
+			height = small_offset,
+		},
+		"Padding X",
+	)
+	elements_height += small_offset * 2
+
+	if (rl.GuiSpinner(
+			    {
+				   x = small_offset,
+				   y = elements_height,
+				   width = big_offset * 2,
+				   height = small_offset,
+			   },
+			   "",
+			   &g_mem.packer_settings.pixel_padding_y_int,
+			   0,
+			   10,
+			   spinner_edit_mode,
+		   )) >
+	   0 {spinner_edit_mode = !spinner_edit_mode}
+	rl.GuiLabel(
+		 {
+			x = (small_offset * 2) + big_offset * 2,
+			y = elements_height,
+			width = big_offset,
+			height = small_offset,
+		},
+		"Padding Y",
+	)
+	elements_height += small_offset * 2
+
+	rl.GuiLine({y = elements_height, width = left_half_rect.width}, "Actions")
 	elements_height += small_offset
 
 	if rl.GuiButton(
@@ -210,12 +293,10 @@ draw_atlas_settings_and_preview :: proc() {
 		   },
 		   "Pack",
 	   ) {
-
+                g_mem.atlas_render = true
 	}
 	elements_height += small_offset * 2
 
-	rl.GuiLine({y = elements_height, width = left_half_rect.width}, "Save Settings")
-	elements_height += small_offset
 
 	if rl.GuiButton(
 		    {
@@ -226,7 +307,7 @@ draw_atlas_settings_and_preview :: proc() {
 		   },
 		   "Save",
 	   ) {
-
+                save_output()
 	}
 	if rl.GuiButton(
 		    {
@@ -243,16 +324,26 @@ draw_atlas_settings_and_preview :: proc() {
 	elements_height = 0
 	rl.GuiPanel(right_half_rect, "Atlas Preview")
 	short_edge := min(
-		right_half_rect.height - big_offset * 2,
-		right_half_rect.width - big_offset * 2,
+		right_half_rect.height - big_offset * 1.5,
+		right_half_rect.width - big_offset * 1.5,
 	)
 	preview_rect := rl.Rectangle {
-		x      = right_half_rect.x + big_offset,
-		y      = right_half_rect.y + big_offset,
+		x      = (right_half_rect.width / 2 + right_half_rect.x) - (short_edge / 2),
+		y      = (right_half_rect.height / 2 + right_half_rect.y) - (short_edge / 2),
 		width  = short_edge,
 		height = short_edge,
 	}
 	rl.GuiDummyRec(preview_rect, "PREVIEW")
+        preview_rect.x += 10; preview_rect.y += 10; preview_rect.height-=20;preview_rect.width-=20
+	texture := &g_mem.atlas_render_texture_target.texture
+	rl.DrawTexturePro(
+		texture^,
+		{width = auto_cast texture.width, height = auto_cast -texture.height},
+		preview_rect,
+		{0, 0},
+		0,
+		rl.WHITE,
+	)
 }
 
 open_file_dialog_and_store_output_paths :: proc() {
