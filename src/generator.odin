@@ -80,7 +80,6 @@ pack_atlas_entries :: proc(
 	offset_y: int = 0,
 ) {
 	all_entries: [dynamic]rl.Image // it's fine to store it like this, rl.Image just stores a pointer to the data
-	// todo: set up the stb_rect_pack rectangles
 	{
 		for entry in entries {
 			append(&all_entries, ..entry.cells[:])
@@ -117,7 +116,7 @@ pack_atlas_entries :: proc(
 	ctx: stbrp.Context
 	stbrp.init_target(&ctx, atlas.width, atlas.height, &nodes[0], auto_cast num_entries)
 	res := stbrp.pack_rects(&ctx, &rects[0], auto_cast num_entries)
-	if bool(res) {
+	if res == 1 {
 		fmt.println("Packed everything successfully!")
 		fmt.printfln("Rects: {0}", rects[:])
 	} else {

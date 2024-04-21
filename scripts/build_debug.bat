@@ -1,2 +1,2 @@
 @echo off
-odin build src/main_release -define:RAYLIB_SHARED=false -out:build/game_debug.exe -no-bounds-check -subsystem:windows -debug
+odin build src/aseprite_odin_generator -define:RAYLIB_SHARED=true -out:build_generator/aseprite_odin_generator.exe -debug
