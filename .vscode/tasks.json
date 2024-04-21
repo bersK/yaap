@@ -1,60 +1,80 @@
 {
-    "version": "2.0.0",
-    "command": "",
-    "args": [],
-    "tasks": [
-        {
-            "label": "Build Debug",
-            "type": "shell",
-            "windows": {
-                "command": "${workspaceFolder}/scripts/build_debug.bat",
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/build_debug.sh",
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/build_debug.sh",
-            },
-            "group": "build"
-        },
-        {
-            "label": "Build Release",
-            "type": "shell",
-            "windows": {
-                "command": "${workspaceFolder}/scripts/build_release.bat",
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/build_release.sh",
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/build_release.sh",
-            },
-            "group": "build"
-        },
-        {
-            "label": "Build Hot Reload",
-            "type": "shell",
-            "windows": {
-                "command": "${workspaceFolder}/scripts/build_hot_reload.bat; start game.exe",
-            },
-            "linux": {
-                "command": "${workspaceFolder}/scripts/build_hot_reload.sh",
-            },
-            "osx": {
-                "command": "${workspaceFolder}/scripts/build_hot_reload.sh",
-            },
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": false,
-                "clear": true
-            },
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
-        }
-    ]
+        "version": "2.0.0",
+        "command": "",
+        "args": [],
+        "tasks": [
+                {
+                        "label": "Build Debug",
+                        "type": "shell",
+                        "windows": {
+                                "command": "${workspaceFolder}/scripts/build_debug.bat",
+                        },
+                        "linux": {
+                                "command": "${workspaceFolder}/scripts/build_debug.sh",
+                        },
+                        "osx": {
+                                "command": "${workspaceFolder}/scripts/build_debug.sh",
+                        },
+                        "group": "build"
+                },
+                {
+                        "label": "Build Release",
+                        "type": "shell",
+                        "windows": {
+                                "command": "${workspaceFolder}/scripts/build_release.bat",
+                        },
+                        "linux": {
+                                "command": "${workspaceFolder}/scripts/build_release.sh",
+                        },
+                        "osx": {
+                                "command": "${workspaceFolder}/scripts/build_release.sh",
+                        },
+                        "group": "build"
+                },
+                {
+                        "label": "Build Hot Reload",
+                        "type": "shell",
+                        "windows": {
+                                "command": "${workspaceFolder}/scripts/build_hot_reload.bat; start game.exe",
+                        },
+                        "linux": {
+                                "command": "${workspaceFolder}/scripts/build_hot_reload.sh",
+                        },
+                        "osx": {
+                                "command": "${workspaceFolder}/scripts/build_hot_reload.sh",
+                        },
+                        "presentation": {
+                                "echo": true,
+                                "reveal": "always",
+                                "focus": false,
+                                "panel": "dedicated",
+                                "showReuseMessage": false,
+                                "clear": true
+                        },
+                        "group": {
+                                "kind": "build",
+                                "isDefault": false
+                        },
+                },
+                {
+                        "label": "Build&Run Tile Generator Test",
+                        "type": "shell",
+                        "command": "odin run src/aseprite_odin_generator -out:build/aseprite_odin_generator.exe",
+                        "options": {
+                                "cwd": "${workspaceFolder}"
+                        },
+                        "presentation": {
+                                "echo": true,
+                                "reveal": "always",
+                                "focus": false,
+                                "panel": "dedicated",
+                                "showReuseMessage": false,
+                                "clear": true
+                        },
+                        "group": {
+                                "kind": "build",
+                                "isDefault": true
+                        },
+                }
+        ]
 }

@@ -293,7 +293,7 @@ draw_atlas_settings_and_preview :: proc() {
 		   },
 		   "Pack",
 	   ) {
-                g_mem.atlas_render = true
+		g_mem.atlas_render = true
 	}
 	elements_height += small_offset * 2
 
@@ -307,7 +307,7 @@ draw_atlas_settings_and_preview :: proc() {
 		   },
 		   "Save",
 	   ) {
-                save_output()
+		save_output()
 	}
 	if rl.GuiButton(
 		    {
@@ -334,7 +334,7 @@ draw_atlas_settings_and_preview :: proc() {
 		height = short_edge,
 	}
 	rl.GuiDummyRec(preview_rect, "PREVIEW")
-        preview_rect.x += 10; preview_rect.y += 10; preview_rect.height-=20;preview_rect.width-=20
+	preview_rect.x += 10;preview_rect.y += 10;preview_rect.height -= 20;preview_rect.width -= 20
 	texture := &g_mem.atlas_render_texture_target.texture
 	rl.DrawTexturePro(
 		texture^,
@@ -394,7 +394,7 @@ open_file_dialog_and_store_output_paths :: proc() {
 }
 
 draw_and_handle_source_files_logic :: proc() {
-	switch g_mem.app_screen {
+	#partial switch g_mem.app_screen {
 	case .SourceFilesPicker:
 		result := rl.GuiTextInputBox(
 			rl.Rectangle{width = (w / scaling), height = (h / scaling)},
@@ -445,8 +445,6 @@ draw_and_handle_source_files_logic :: proc() {
 			handle_source_file_logic(file_dialg_type)
 			fmt.println("result: ", result)
 		}
-	case .PackSettingsAndPreview:
-		draw_packer_and_settings()
 	}
 }
 
