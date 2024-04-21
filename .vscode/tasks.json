@@ -59,7 +59,13 @@
                 {
                         "label": "Build&Run Tile Generator Test",
                         "type": "shell",
-                        "command": "odin run src/aseprite_odin_generator -out:build/aseprite_odin_generator.exe",
+                        "command": "odin run",
+                        "args": [
+                                "src/aseprite_odin_generator",
+                                "-define:RAYLIB_SHARED=true",
+                                "-out:build_generator/aseprite_odin_generator.exe",
+                                "-debug"
+                        ],
                         "options": {
                                 "cwd": "${workspaceFolder}"
                         },
