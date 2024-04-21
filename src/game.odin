@@ -11,6 +11,7 @@
 
 package game
 
+import "core:math"
 import "core:fmt"
 import "core:strings"
 import rl "vendor:raylib"
@@ -53,10 +54,10 @@ FileDialogType :: enum {
 }
 
 PackerSettings :: struct {
+	atlas_size_x:        i32,
+	atlas_size_y:        i32,
 	pixel_padding_x_int: i32,
-	pixel_padding_x:     f32,
 	pixel_padding_y_int: i32,
-	pixel_padding_y:     f32,
 	padding_enabled:     bool,
 	fix_pixel_bleeding:  bool,
 	output_json:         bool,
@@ -87,6 +88,8 @@ GameMemory :: struct {
 	packer_settings:                PackerSettings,
 	atlas_render_texture_target:    rl.RenderTexture2D,
 	atlas_render:                   bool,
+	atlas_render_has_preview:       bool,
+        atlas_render_size: i32,
 }
 
 g_mem: ^GameMemory
@@ -134,6 +137,8 @@ draw :: proc() {
 	if g_mem.atlas_render {
 		draw_screen_target()
 	}
+
+        free_all(context.temp_allocator)
 }
 
 update_screen :: proc() {
@@ -180,10 +185,31 @@ draw_screen_target :: proc() {
 	rl.BeginTextureMode(g_mem.atlas_render_texture_target)
 	defer rl.EndTextureMode()
 
-	rl.ClearBackground(rl.WHITE)
-	rl.DrawCircle(100, 100, 50, rl.GREEN)
+	atlas_entries: [dynamic]AtlasEntry
+	if g_mem.input_path_set {
+		unmarshall_aseprite_dir(g_mem.output_folder_path, &atlas_entries)
+	} else if g_mem.input_files_set {
+		unmarshall_aseprite_files(g_mem.source_files_to_pack, &atlas_entries)
+	} else {
+		fmt.println("No source folder or files set! Can't pack the void!!!")
+	}
+	atlas: rl.Image = rl.GenImageColor(g_mem.atlas_render_size, g_mem.atlas_render_size, rl.BLANK)
+	pack_atlas_entries(
+		atlas_entries[:],
+		&atlas,
+		g_mem.packer_settings.pixel_padding_x_int,
+		g_mem.packer_settings.pixel_padding_y_int,
+	)
+	delete(atlas_entries)
+	rl.ImageFlipVertical(&atlas)
+        rl.UnloadTexture(g_mem.atlas_render_texture_target.texture)
+
+	g_mem.atlas_render_texture_target.texture = rl.LoadTextureFromImage(atlas)
+
+        rl.UnloadImage(atlas)
 
 	g_mem.atlas_render = false
+	g_mem.atlas_render_has_preview = true
 }
 
 draw_atlas_settings_and_preview :: proc() {
@@ -202,6 +228,9 @@ draw_atlas_settings_and_preview :: proc() {
 	rl.DrawRectangleRec(left_half_rect, rl.WHITE)
 	rl.DrawRectangleRec(right_half_rect, rl.MAROON)
 
+	@(static)
+	spinner_edit_mode: bool
+
 	small_offset := 10 * scaling
 	big_offset := 30 * scaling
 	elements_height: f32 = 0
@@ -212,11 +241,35 @@ draw_atlas_settings_and_preview :: proc() {
 	rl.GuiLine({y = elements_height, width = left_half_rect.width}, "General Settings")
 	elements_height += small_offset
 
-	rl.GuiCheckBox(
-		{x = small_offset, y = elements_height, width = small_offset, height = small_offset},
-		"Fix pixel bleed",
-		&g_mem.packer_settings.padding_enabled,
-	)
+	@(static)
+	DropdownBox000EditMode: bool
+	@(static)
+	DropdownBox000Active: i32
+
+
+	dropdown_rect := rl.Rectangle {
+		x      = small_offset,
+		y      = elements_height,
+		width  = big_offset * 2,
+		height = small_offset,
+	}
+
+        // Because we want to render this ontop of everything else, we can just 'defer' it at the end of the draw function
+	defer {
+		if DropdownBox000EditMode {rl.GuiLock()}
+
+		if rl.GuiDropdownBox(
+			   dropdown_rect,
+			   "256x;512x;1024x;2048x;4096x",
+			   &DropdownBox000Active,
+			   DropdownBox000EditMode,
+		   ) {
+			DropdownBox000EditMode = !DropdownBox000EditMode
+                        fmt.println(DropdownBox000Active)
+                        g_mem.atlas_render_size = 256 * auto_cast math.pow(2, f32(DropdownBox000Active))
+		}
+		rl.GuiUnlock()
+	}
 	elements_height += small_offset * 2
 
 	rl.GuiLine({y = elements_height, width = left_half_rect.width}, "Padding Settings")
@@ -229,8 +282,6 @@ draw_atlas_settings_and_preview :: proc() {
 	)
 	elements_height += small_offset * 2
 
-	@(static)
-	spinner_edit_mode: bool
 	if (rl.GuiSpinner(
 			    {
 				   x = small_offset,
@@ -333,7 +384,11 @@ draw_atlas_settings_and_preview :: proc() {
 		width  = short_edge,
 		height = short_edge,
 	}
-	rl.GuiDummyRec(preview_rect, "PREVIEW")
+	if !g_mem.atlas_render_has_preview {
+		rl.GuiDummyRec(preview_rect, "PREVIEW")
+	} else {
+		rl.DrawRectangleRec(preview_rect, rl.WHITE)
+	}
 	preview_rect.x += 10;preview_rect.y += 10;preview_rect.height -= 20;preview_rect.width -= 20
 	texture := &g_mem.atlas_render_texture_target.texture
 	rl.DrawTexturePro(
