@@ -32,6 +32,20 @@
                         "group": "build"
                 },
                 {
+                        "label": "Clean build folder(s)",
+                        "type": "shell",
+                        "windows": {
+                                "command": "cd ${workspaceFolder}\\build && rm game*; cd ${workspaceFolder} && rm aseprite_odin_generator*",
+                        },
+                        // "linux": {
+                        //         "command": "${workspaceFolder}/scripts/build_release.sh",
+                        // },
+                        // "osx": {
+                        //         "command": "${workspaceFolder}/scripts/build_release.sh",
+                        // },
+                        "group": "build"
+                },
+                {
                         "label": "Build Hot Reload",
                         "type": "shell",
                         "windows": {

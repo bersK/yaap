@@ -23,22 +23,15 @@ main :: proc() {
 		fmt.panicf("Couldn't load file!")
 	}
 
-	doc: ase.Document
-	read, um_err := ase.unmarshal_from_slice(ase_file, &doc)
-	if um_err != nil {
-		fmt.panicf("Couldn't unmarshall file!")
-	} else {
-		fmt.printfln("Read {0} bytes from file", read)
-	}
-
-	fmt.println("Header:\n\t", doc.header)
-	// fmt.println("Frames:\n\t", doc.frames)
+	cwd := os.get_current_directory()
+	target_dir := strings.concatenate({cwd, "\\src\\aseprite_odin_generator\\"})
 
 	atlas: rl.Image = rl.GenImageColor(ATLAS_SIZE, ATLAS_SIZE, rl.BLANK)
+	atlas_entries: [dynamic]gen.AtlasEntry
+	gen.unmarshall_aseprite_dir(target_dir, &atlas_entries)
 
-	atlas_entry := gen.atlas_entry_from_compressed_cells(doc)
-        // Packs the cells & blits them to the atlas
-        gen.pack_atlas_entries({atlas_entry}, &atlas)
+
+	gen.pack_atlas_entries(atlas_entries[:], &atlas, 10, 10)
 
 	rl.ExportImage(atlas, EXPORT_PATH)
 }

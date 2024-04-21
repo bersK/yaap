@@ -13,11 +13,13 @@ AtlasEntry :: struct {
 }
 
 unmarshall_aseprite_dir :: proc(path: string, atlas_entries: ^[dynamic]AtlasEntry) {
-	fp.dir(path)
-	if fd, ok := os.open(path); ok == 0 {
-		if fi_files, fi_ok := os.read_dir(fd, -1); fi_ok == 0 {
-			unmarshall_aseprite_files_file_info(fi_files, atlas_entries)
+	if dir_fd, err := os.open(path, os.O_RDONLY); err == os.ERROR_NONE {
+		fis: []os.File_Info
+		if fis, err = os.read_dir(dir_fd, -1); err == os.ERROR_NONE {
+			unmarshall_aseprite_files_file_info(fis, atlas_entries)
 		}
+	} else {
+		fmt.println("Couldn't open folder: ", path)
 	}
 }
 
@@ -33,10 +35,15 @@ unmarshall_aseprite_files_file_info :: proc(
 }
 
 unmarshall_aseprite_files :: proc(file_paths: []string, atlas_entries: ^[dynamic]AtlasEntry) {
-	current_document: ase.Document
-	for fp in file_paths {
-		atlas_entry := atlas_entry_from_compressed_cells(current_document)
-		ase.unmarshal_from_filename(fp, &current_document)
+	aseprite_document: ase.Document
+	for file in file_paths {
+		extension := fp.ext(file)
+		if extension != ".aseprite" {continue}
+
+		fmt.println("Unmarshalling file: ", file)
+		ase.unmarshal_from_filename(file, &aseprite_document)
+		atlas_entry := atlas_entry_from_compressed_cells(aseprite_document)
+
 		append(atlas_entries, atlas_entry)
 	}
 }
@@ -71,14 +78,9 @@ atlas_entry_from_compressed_cells :: proc(document: ase.Document) -> (atlas_entr
 }
 
 /*
-        Takes in a slice of entries, an output texture, the width & height 
+        Takes in a slice of entries, an output texture and offsets (offset_x/y)
 */
-pack_atlas_entries :: proc(
-	entries: []AtlasEntry,
-	atlas: ^rl.Image,
-	offset_x: int = 0,
-	offset_y: int = 0,
-) {
+pack_atlas_entries :: proc(entries: []AtlasEntry, atlas: ^rl.Image, offset_x: i32, offset_y: i32) {
 	all_entries: [dynamic]rl.Image // it's fine to store it like this, rl.Image just stores a pointer to the data
 	{
 		for entry in entries {
@@ -100,7 +102,7 @@ pack_atlas_entries :: proc(
 	cellIdx: int
 	for &entry, entryIdx in entries {
 		for &cell in entry.cells {
-                        // I can probably infer this information with just the id of the rect but I'm being lazy right now
+			// I can probably infer this information with just the id of the rect but I'm being lazy right now
 			map_insert(&rect_idx_to_entry_and_cell, cellIdx, EntryAndCell{&entry, &cell})
 			rects[cellIdx].id = auto_cast entryIdx
 			cellIdx += 1
@@ -109,13 +111,13 @@ pack_atlas_entries :: proc(
 
 	for entry, entryIdx in all_entries {
 		entry_stb_rect := &rects[entryIdx]
-		entry_stb_rect.w = auto_cast entry.width
-		entry_stb_rect.h = auto_cast entry.height
+		entry_stb_rect.w = stbrp.Coord(entry.width + offset_x * 2)
+		entry_stb_rect.h = stbrp.Coord(entry.height + offset_y * 2)
 	}
 
 	ctx: stbrp.Context
-	stbrp.init_target(&ctx, atlas.width, atlas.height, &nodes[0], auto_cast num_entries)
-	res := stbrp.pack_rects(&ctx, &rects[0], auto_cast num_entries)
+	stbrp.init_target(&ctx, atlas.width, atlas.height, &nodes[0], i32(num_entries))
+	res := stbrp.pack_rects(&ctx, &rects[0], i32(num_entries))
 	if res == 1 {
 		fmt.println("Packed everything successfully!")
 		fmt.printfln("Rects: {0}", rects[:])
@@ -135,11 +137,12 @@ pack_atlas_entries :: proc(
 		}
 		// Placing it in the atlas in the calculated offsets (in the packing step)
 		dst_rect := rl.Rectangle {
-			auto_cast rect.x,
-			auto_cast rect.y,
+			auto_cast rect.x + auto_cast offset_x,
+			auto_cast rect.y + auto_cast offset_y,
 			auto_cast cell.width,
 			auto_cast cell.height,
 		}
+		fmt.printfln("Src rect: {0}\nDst rect:{1}", src_rect, dst_rect)
 
 		rl.ImageDraw(atlas, cell^, src_rect, dst_rect, rl.WHITE)
 	}
