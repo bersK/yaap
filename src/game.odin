@@ -11,8 +11,8 @@
 
 package game
 
-import "core:math"
 import "core:fmt"
+import "core:math"
 import "core:strings"
 import rl "vendor:raylib"
 
@@ -89,7 +89,7 @@ GameMemory :: struct {
 	atlas_render_texture_target:    rl.RenderTexture2D,
 	atlas_render:                   bool,
 	atlas_render_has_preview:       bool,
-        atlas_render_size: i32,
+	atlas_render_size:              i32,
 }
 
 g_mem: ^GameMemory
@@ -138,7 +138,7 @@ draw :: proc() {
 		draw_screen_target()
 	}
 
-        free_all(context.temp_allocator)
+	free_all(context.temp_allocator)
 }
 
 update_screen :: proc() {
@@ -202,11 +202,11 @@ draw_screen_target :: proc() {
 	)
 	delete(atlas_entries)
 	rl.ImageFlipVertical(&atlas)
-        rl.UnloadTexture(g_mem.atlas_render_texture_target.texture)
+	rl.UnloadTexture(g_mem.atlas_render_texture_target.texture)
 
 	g_mem.atlas_render_texture_target.texture = rl.LoadTextureFromImage(atlas)
 
-        rl.UnloadImage(atlas)
+	rl.UnloadImage(atlas)
 
 	g_mem.atlas_render = false
 	g_mem.atlas_render_has_preview = true
@@ -254,7 +254,7 @@ draw_atlas_settings_and_preview :: proc() {
 		height = small_offset,
 	}
 
-        // Because we want to render this ontop of everything else, we can just 'defer' it at the end of the draw function
+	// Because we want to render this ontop of everything else, we can just 'defer' it at the end of the draw function
 	defer {
 		if DropdownBox000EditMode {rl.GuiLock()}
 
@@ -265,8 +265,8 @@ draw_atlas_settings_and_preview :: proc() {
 			   DropdownBox000EditMode,
 		   ) {
 			DropdownBox000EditMode = !DropdownBox000EditMode
-                        fmt.println(DropdownBox000Active)
-                        g_mem.atlas_render_size = 256 * auto_cast math.pow(2, f32(DropdownBox000Active))
+			fmt.println(DropdownBox000Active)
+			g_mem.atlas_render_size = 256 * auto_cast math.pow(2, f32(DropdownBox000Active))
 		}
 		rl.GuiUnlock()
 	}
