@@ -1,3 +1,6 @@
 [submodule "src/aseprite"]
 	path = src/aseprite
 	url = https://github.com/bersK/odin-aseprite.git
+[submodule "src/dialog/libtinyfiledialogs"]
+	path = src/dialog/libtinyfiledialogs
+	url = https://github.com/native-toolkit/libtinyfiledialogs.git

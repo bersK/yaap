@@ -16,3 +16,4 @@ linux
 build/
 build_generator/
 ols.json
+libtinyfiledialogs.a

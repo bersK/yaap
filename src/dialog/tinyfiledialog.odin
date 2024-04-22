@@ -4,10 +4,8 @@ import "core:c"
 
 when ODIN_OS == .Windows {
 	foreign import lib {"tinyfiledialogs.lib", "system:comdlg32.lib", "system:Ole32.lib"}
-}
-when ODIN_OS == .Linux {
-
-	foreign import lib {"libtinyfiledialogs.a"}
+} else when ODIN_OS == .Linux || ODIN_OS == .Darwin {
+	foreign import lib "libtinyfiledialogs.a"
 }
 
 foreign lib {
