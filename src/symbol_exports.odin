@@ -36,7 +36,12 @@ game_init :: proc() {
 		h = 720,
 	}
 
-	g_mem.atlas_render_texture_target = rl.LoadRenderTexture(2048, 2048)
+	g_mem.atlas_render_texture_target = rl.LoadRenderTexture(256, 256)
+        g_mem.atlas_render_size = 256
+
+	checkered_img := rl.GenImageChecked(256, 256, 256 / 4, 256 / 4, rl.GRAY, rl.DARKGRAY)
+        defer rl.UnloadImage(checkered_img)
+        g_mem.atlas_checked_background.texture = rl.LoadTextureFromImage(checkered_img)
 
 	rl.SetTargetFPS(rl.GetMonitorRefreshRate(current_monitor))
 	rl.GuiLoadStyle("./styles/style_candy.rgs")

@@ -18,83 +18,7 @@ import rl "vendor:raylib"
 
 import diag "dialog"
 
-PixelWindowHeight :: 180
-
-/*
-	`SourceFilesPicker` // Screen 1: Shows the file dialog box, meant for the user to choose the source files/folder
-	`OutputLocationPicker` // Screen 2: Shows the file dialog box, meant for the user to choose the output file name & location
-	`PackSettingsAndPreview` Screen 3: Shows settings about the packing operations, `save` & `save as` button
-	`SaveToOutputPicker` // Screen 4: After clicking the `save as` button on screen 3, ask the user for a new location & name and save the file
-*/
-
-AppScreen :: enum {
-	SourceFilesPicker,
-	OutputLocationPicker,
-	PackSettingsAndPreview,
-	SaveToOutputPicker,
-}
-
-WindowInformation :: struct {
-	w:             f32,
-	h:             f32,
-	width_scaled:  f32,
-	height_scaled: f32,
-}
-
-MonitorInformation :: struct {
-	max_width:  f32,
-	max_height: f32,
-}
-
-FileDialogType :: enum {
-	SourceFiles,
-	SourceFolder,
-	OutputFolder,
-	Exit,
-}
-
-PackerSettings :: struct {
-	atlas_size_x:        i32,
-	atlas_size_y:        i32,
-	pixel_padding_x_int: i32,
-	pixel_padding_y_int: i32,
-	padding_enabled:     bool,
-	fix_pixel_bleeding:  bool,
-	output_json:         bool,
-	output_odin:         bool,
-}
-
-FILE_DIALOG_SIZE :: 1000
-GameMemory :: struct {
-	file_dialog_text_buffer:        [FILE_DIALOG_SIZE + 1]u8,
-	is_packing_whole_source_folder: bool,
-	should_open_file_dialog:        bool,
-	window_info:                    WindowInformation,
-	monitor_info:                   MonitorInformation,
-	// atlas packer state
-	app_screen:                     AppScreen,
-	// Where the output files will be written (atlas.png, json output, etc)
-	output_path_set:                bool,
-	output_folder_path:             string,
-	// If files were chosen as input - their paths
-	input_path_set:                 bool,
-	source_location_to_pack:        string,
-	// If a folder was chosen as input - the path
-	input_files_set:                bool,
-	source_files_to_pack:           []string,
-	// What type of file dialog to open
-	source_location_type:           FileDialogType,
-	// Packer settings
-	packer_settings:                PackerSettings,
-	atlas_render_texture_target:    rl.RenderTexture2D,
-	atlas_render:                   bool,
-	atlas_render_has_preview:       bool,
-	atlas_render_size:              i32,
-}
-
 g_mem: ^GameMemory
-
-w, h: f32
 
 game_camera :: proc() -> rl.Camera2D {
 	w = f32(rl.GetScreenWidth())
@@ -103,13 +27,10 @@ game_camera :: proc() -> rl.Camera2D {
 	return {zoom = h / PixelWindowHeight, target = {}, offset = {w / 2, h / 2}}
 }
 
-scaling: f32 = 2
 ui_camera :: proc() -> rl.Camera2D {
 	return {zoom = scaling}
 }
 
-input_box_loc: rl.Vector2 = {}
-moving_input_box: bool
 update :: proc() {
 	// Update the width/height
 	win_info := &g_mem.window_info
@@ -123,7 +44,9 @@ update :: proc() {
 	// Update the virtual mouse position (needed for GUI interaction to work properly for instance)
 	rl.SetMouseScale(1 / scaling, 1 / scaling)
 
-	update_screen()
+	if g_mem.should_open_file_dialog {
+		open_file_dialog_and_store_output_paths()
+	}
 }
 
 draw :: proc() {
@@ -134,81 +57,55 @@ draw :: proc() {
 
 	draw_screen_ui()
 
-	if g_mem.atlas_render {
+	if g_mem.should_render_atlas {
 		draw_screen_target()
 	}
 
 	free_all(context.temp_allocator)
 }
 
-update_screen :: proc() {
-	if (g_mem.input_files_set || g_mem.input_path_set) {
-		if !g_mem.output_path_set {
-			g_mem.app_screen = .OutputLocationPicker
-		} else {
-			g_mem.app_screen = .PackSettingsAndPreview
-		}
-	} else {
-		g_mem.app_screen = .SourceFilesPicker
-	}
-
-	switch g_mem.app_screen {
-	case .SourceFilesPicker:
-		fallthrough
-	case .OutputLocationPicker:
-		fallthrough
-	case .SaveToOutputPicker:
-		if g_mem.should_open_file_dialog {
-			open_file_dialog_and_store_output_paths()
-		}
-	case .PackSettingsAndPreview:
-	}
-}
-
 draw_screen_ui :: proc() {
 	rl.BeginMode2D(ui_camera())
 	defer rl.EndMode2D()
 
-	switch g_mem.app_screen {
-	case .SourceFilesPicker:
-		fallthrough
-	case .OutputLocationPicker:
-		fallthrough
-	case .SaveToOutputPicker:
-		draw_and_handle_source_files_logic()
-	case .PackSettingsAndPreview:
-		draw_atlas_settings_and_preview()
-	}
+	draw_atlas_settings_and_preview()
 }
 
 draw_screen_target :: proc() {
-	rl.BeginTextureMode(g_mem.atlas_render_texture_target)
+	atlas_render_target := &g_mem.atlas_render_texture_target
+
+	rl.BeginTextureMode(atlas_render_target^)
 	defer rl.EndTextureMode()
 
 	atlas_entries: [dynamic]AtlasEntry
+	delete(atlas_entries)
+
 	if g_mem.input_path_set {
 		unmarshall_aseprite_dir(g_mem.output_folder_path, &atlas_entries)
 	} else if g_mem.input_files_set {
 		unmarshall_aseprite_files(g_mem.source_files_to_pack, &atlas_entries)
 	} else {
 		fmt.println("No source folder or files set! Can't pack the void!!!")
+		g_mem.should_render_atlas = false
+		return
 	}
+
 	atlas: rl.Image = rl.GenImageColor(g_mem.atlas_render_size, g_mem.atlas_render_size, rl.BLANK)
-	pack_atlas_entries(
-		atlas_entries[:],
-		&atlas,
-		g_mem.packer_settings.pixel_padding_x_int,
-		g_mem.packer_settings.pixel_padding_y_int,
-	)
-	delete(atlas_entries)
+	// defer rl.UnloadImage(atlas)
+
+	padding_x :=
+		g_mem.packer_settings.pixel_padding_x_int if g_mem.packer_settings.padding_enabled else 0
+	padding_y :=
+		g_mem.packer_settings.pixel_padding_y_int if g_mem.packer_settings.padding_enabled else 0
+	pack_atlas_entries(atlas_entries[:], &atlas, padding_x, padding_y)
+
+	// OpenGL's Y buffer is flipped
 	rl.ImageFlipVertical(&atlas)
-	rl.UnloadTexture(g_mem.atlas_render_texture_target.texture)
+	// rl.UnloadTexture(atlas_render_target.texture)
+        fmt.println("Packed everything!")
+	atlas_render_target.texture = rl.LoadTextureFromImage(atlas)
 
-	g_mem.atlas_render_texture_target.texture = rl.LoadTextureFromImage(atlas)
-
-	rl.UnloadImage(atlas)
-
-	g_mem.atlas_render = false
+	g_mem.should_render_atlas = false
 	g_mem.atlas_render_has_preview = true
 }
 
@@ -236,21 +133,30 @@ draw_atlas_settings_and_preview :: proc() {
 	elements_height: f32 = 0
 
 	rl.GuiPanel(left_half_rect, "Atlas Settings")
-	elements_height += 25 * scaling
+	elements_height += small_offset / 2
 
-	rl.GuiLine({y = elements_height, width = left_half_rect.width}, "General Settings")
-	elements_height += small_offset
+	@(static)
+	SettingsDropBoxEditMode: bool
+	@(static)
+	SettingsDropdownBoxActive: i32
+
+	elements_height += small_offset + 5 * scaling
+
+	rl.GuiLabel(
+		{x = small_offset, y = elements_height, width = left_half_rect.width},
+		"Atlas Size",
+	)
+	elements_height += small_offset / 2
 
 	@(static)
 	DropdownBox000EditMode: bool
 	@(static)
 	DropdownBox000Active: i32
 
-
 	dropdown_rect := rl.Rectangle {
 		x      = small_offset,
 		y      = elements_height,
-		width  = big_offset * 2,
+		width  = left_half_rect.width - small_offset * 2,
 		height = small_offset,
 	}
 
@@ -272,103 +178,196 @@ draw_atlas_settings_and_preview :: proc() {
 	}
 	elements_height += small_offset * 2
 
-	rl.GuiLine({y = elements_height, width = left_half_rect.width}, "Padding Settings")
-	elements_height += small_offset
 
-	rl.GuiCheckBox(
-		{x = small_offset, y = elements_height, width = small_offset, height = small_offset},
-		"Enable padding",
-		&g_mem.packer_settings.fix_pixel_bleeding,
-	)
-	elements_height += small_offset * 2
+	// General Options
+	if SettingsDropdownBoxActive == 0 {
+		padding_settings_y := elements_height
+		{
+			defer rl.GuiGroupBox(
+				 {
+					x = small_offset / 2,
+					y = padding_settings_y,
+					width = left_half_rect.width - small_offset,
+					height = elements_height - padding_settings_y,
+				},
+				"Padding Settings",
+			)
+			elements_height += small_offset
 
-	if (rl.GuiSpinner(
-			    {
-				   x = small_offset,
-				   y = elements_height,
-				   width = big_offset * 2,
-				   height = small_offset,
-			   },
-			   "",
-			   &g_mem.packer_settings.pixel_padding_x_int,
-			   0,
-			   10,
-			   spinner_edit_mode,
-		   )) >
-	   0 {spinner_edit_mode = !spinner_edit_mode}
-	rl.GuiLabel(
-		 {
-			x = (small_offset * 2) + big_offset * 2,
-			y = elements_height,
-			width = big_offset,
-			height = small_offset,
-		},
-		"Padding X",
-	)
-	elements_height += small_offset * 2
+			rl.GuiCheckBox(
+				 {
+					x = small_offset,
+					y = elements_height,
+					width = small_offset,
+					height = small_offset,
+				},
+				"  Enable padding",
+				&g_mem.packer_settings.fix_pixel_bleeding,
+			)
+			elements_height += small_offset * 2
 
-	if (rl.GuiSpinner(
-			    {
-				   x = small_offset,
-				   y = elements_height,
-				   width = big_offset * 2,
-				   height = small_offset,
-			   },
-			   "",
-			   &g_mem.packer_settings.pixel_padding_y_int,
-			   0,
-			   10,
-			   spinner_edit_mode,
-		   )) >
-	   0 {spinner_edit_mode = !spinner_edit_mode}
-	rl.GuiLabel(
-		 {
-			x = (small_offset * 2) + big_offset * 2,
-			y = elements_height,
-			width = big_offset,
-			height = small_offset,
-		},
-		"Padding Y",
-	)
-	elements_height += small_offset * 2
+			if (rl.GuiSpinner(
+					    {
+						   x = small_offset,
+						   y = elements_height,
+						   width = big_offset * 2,
+						   height = small_offset,
+					   },
+					   "",
+					   &g_mem.packer_settings.pixel_padding_x_int,
+					   0,
+					   10,
+					   spinner_edit_mode,
+				   )) >
+			   0 {spinner_edit_mode = !spinner_edit_mode}
+			rl.GuiLabel(
+				 {
+					x = (small_offset * 2) + big_offset * 2,
+					y = elements_height,
+					width = big_offset,
+					height = small_offset,
+				},
+				"Padding X",
+			)
+			elements_height += small_offset * 2
 
-	rl.GuiLine({y = elements_height, width = left_half_rect.width}, "Actions")
-	elements_height += small_offset
+			if (rl.GuiSpinner(
+					    {
+						   x = small_offset,
+						   y = elements_height,
+						   width = big_offset * 2,
+						   height = small_offset,
+					   },
+					   "",
+					   &g_mem.packer_settings.pixel_padding_y_int,
+					   0,
+					   10,
+					   spinner_edit_mode,
+				   )) >
+			   0 {spinner_edit_mode = !spinner_edit_mode}
+			rl.GuiLabel(
+				 {
+					x = (small_offset * 2) + big_offset * 2,
+					y = elements_height,
+					width = big_offset,
+					height = small_offset,
+				},
+				"Padding Y",
+			)
+			elements_height += small_offset * 2
 
-	if rl.GuiButton(
-		    {
-			   x = small_offset,
-			   y = elements_height,
-			   width = left_half_rect.width / 2 - small_offset * 2,
-			   height = small_offset,
-		   },
-		   "Pack",
-	   ) {
-		g_mem.atlas_render = true
+		}
+		elements_height += small_offset
+
+		// rl.GuiLine({y = elements_height, width = left_half_rect.width}, "Actions")
+		// elements_height += small_offset
+
+		actions_label_y := elements_height
+		{
+			defer rl.GuiGroupBox(
+				 {
+					x = small_offset / 2,
+					y = actions_label_y,
+					width = left_half_rect.width - small_offset,
+					height = elements_height - actions_label_y,
+				},
+				"Actions",
+			)
+			elements_height += small_offset
+
+			if rl.GuiButton(
+				    {
+					   x = small_offset,
+					   y = elements_height,
+					   width = left_half_rect.width / 2 - small_offset,
+					   height = small_offset,
+				   },
+				   "Pick Source(s)",
+			   ) {
+				g_mem.should_open_file_dialog = true
+				g_mem.source_location_type = .SourceFiles
+			}
+			if rl.GuiButton(
+				    {
+					   x = left_half_rect.width / 2,
+					   y = elements_height,
+					   width = left_half_rect.width / 2 - small_offset,
+					   height = small_offset,
+				   },
+				   "Pick Output",
+			   ) {
+				g_mem.should_open_file_dialog = true
+				g_mem.source_location_type = .OutputFolder
+			}
+			elements_height += small_offset * 2
+
+
+			if rl.GuiButton(
+				    {
+					   x = small_offset,
+					   y = elements_height,
+					   width = left_half_rect.width / 2 - small_offset,
+					   height = small_offset,
+				   },
+				   "Pack Atlas",
+			   ) {
+				g_mem.should_render_atlas = true
+			}
+			if rl.GuiButton(
+				    {
+					   x = left_half_rect.width / 2,
+					   y = elements_height,
+					   width = left_half_rect.width / 2 - small_offset,
+					   height = small_offset,
+				   },
+				   "Clear Atlas",
+			   ) {
+				g_mem.atlas_render_has_preview = false
+			}
+			elements_height += small_offset * 2
+
+			if rl.GuiButton(
+				    {
+					   x = small_offset,
+					   y = elements_height,
+					   width = left_half_rect.width / 2 - small_offset,
+					   height = small_offset,
+				   },
+				   "Save",
+			   ) {
+				save_output()
+			}
+			if rl.GuiButton(
+				    {
+					   x = left_half_rect.width / 2,
+					   y = elements_height,
+					   width = left_half_rect.width / 2 - small_offset,
+					   height = small_offset,
+				   },
+				   "Save To...",
+			   ) {
+			}
+			elements_height += small_offset * 2
+		}
+
 	}
-	elements_height += small_offset * 2
 
+	// Packing Options
+	if SettingsDropdownBoxActive == 1 {
 
-	if rl.GuiButton(
-		    {
-			   x = small_offset,
-			   y = elements_height,
-			   width = left_half_rect.width / 2 - small_offset * 2,
-			   height = small_offset,
-		   },
-		   "Save",
-	   ) {
-		save_output()
+		@(static)
+		active_tab: i32
+		tabs: []cstring = {"One", "Two", "Three"}
+		rl.GuiTabBar(
+			{x = small_offset, y = elements_height, width = 100, height = small_offset},
+			&tabs[0],
+			auto_cast len(tabs),
+			&active_tab,
+		)
 	}
-	if rl.GuiButton(
-		    {
-			   x = left_half_rect.width / 2,
-			   y = elements_height,
-			   width = left_half_rect.width / 2 - small_offset,
-			   height = small_offset,
-		   },
-		   "Save To...",
-	   ) {
+
+	// Save Options
+	if SettingsDropdownBoxActive == 2 {
 
 	}
 
@@ -387,18 +386,28 @@ draw_atlas_settings_and_preview :: proc() {
 	if !g_mem.atlas_render_has_preview {
 		rl.GuiDummyRec(preview_rect, "PREVIEW")
 	} else {
-		rl.DrawRectangleRec(preview_rect, rl.WHITE)
+		// rl.DrawRectangleRec(preview_rect, rl.WHITE)
+		bg_texture := g_mem.atlas_checked_background.texture
+		rl.DrawTexturePro(
+			bg_texture,
+			{width = auto_cast bg_texture.width, height = auto_cast bg_texture.height},
+			preview_rect,
+			{},
+			0,
+			rl.WHITE,
+		)
+		// preview_rect.x +=
+		// 10;preview_rect.y += 10;preview_rect.height -= 20;preview_rect.width -= 20
+		atlas_texture := g_mem.atlas_render_texture_target.texture
+		rl.DrawTexturePro(
+			atlas_texture,
+			{width = auto_cast atlas_texture.width, height = auto_cast -atlas_texture.height},
+			preview_rect,
+			{0, 0},
+			0,
+			rl.WHITE,
+		)
 	}
-	preview_rect.x += 10;preview_rect.y += 10;preview_rect.height -= 20;preview_rect.width -= 20
-	texture := &g_mem.atlas_render_texture_target.texture
-	rl.DrawTexturePro(
-		texture^,
-		{width = auto_cast texture.width, height = auto_cast -texture.height},
-		preview_rect,
-		{0, 0},
-		0,
-		rl.WHITE,
-	)
 }
 
 open_file_dialog_and_store_output_paths :: proc() {
@@ -446,78 +455,4 @@ open_file_dialog_and_store_output_paths :: proc() {
 	}
 
 	g_mem.should_open_file_dialog = false
-}
-
-draw_and_handle_source_files_logic :: proc() {
-	#partial switch g_mem.app_screen {
-	case .SourceFilesPicker:
-		result := rl.GuiTextInputBox(
-			rl.Rectangle{width = (w / scaling), height = (h / scaling)},
-			"Files",
-			"File input box",
-			"Open Source Files;Open Source Folder",
-			cstring(rawptr(&g_mem.file_dialog_text_buffer)),
-			FILE_DIALOG_SIZE,
-			nil,
-		)
-		if result != -1 {
-			file_dialg_type: FileDialogType
-			if result == 1 || result == 2 {
-				file_dialg_type = .SourceFiles if result == 1 else .SourceFolder
-			} else if result == 0 {
-				file_dialg_type = .Exit
-			}
-			handle_source_file_logic(file_dialg_type)
-			fmt.println("result: ", result)
-		}
-	case .OutputLocationPicker:
-		result := rl.GuiTextInputBox(
-			rl.Rectangle{width = (w / scaling), height = (h / scaling)},
-			"Files",
-			"Output Folder",
-			"Choose Output Folder",
-			cstring(rawptr(&g_mem.file_dialog_text_buffer)),
-			FILE_DIALOG_SIZE,
-			nil,
-		)
-		if result != -1 {
-			file_dialg_type: FileDialogType = .OutputFolder if result == 1 else .Exit
-			handle_source_file_logic(file_dialg_type)
-			fmt.println("result: ", result)
-		}
-	case .SaveToOutputPicker:
-		result := rl.GuiTextInputBox(
-			rl.Rectangle{width = (w / scaling), height = (h / scaling)},
-			"Files",
-			"Output Folder",
-			"Choose Output Folder",
-			cstring(rawptr(&g_mem.file_dialog_text_buffer)),
-			FILE_DIALOG_SIZE,
-			nil,
-		)
-		if result != -1 {
-			file_dialg_type: FileDialogType = .SourceFolder if result == 1 else .Exit
-			handle_source_file_logic(file_dialg_type)
-			fmt.println("result: ", result)
-		}
-	}
-}
-
-draw_packer_and_settings :: proc() {
-
-}
-
-handle_source_file_logic :: proc(picker_type: FileDialogType) {
-	switch picker_type {
-	case .Exit:
-		g_mem.should_open_file_dialog = false
-		rl.CloseWindow()
-	case .SourceFiles:
-		fallthrough
-	case .SourceFolder:
-		fallthrough
-	case .OutputFolder:
-		g_mem.source_location_type = picker_type
-		g_mem.should_open_file_dialog = true
-	}
 }

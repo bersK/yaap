@@ -81,6 +81,9 @@ atlas_entry_from_compressed_cells :: proc(document: ase.Document) -> (atlas_entr
         Takes in a slice of entries, an output texture and offsets (offset_x/y)
 */
 pack_atlas_entries :: proc(entries: []AtlasEntry, atlas: ^rl.Image, offset_x: i32, offset_y: i32) {
+        assert(atlas.width != 0, "This shouldn't be 0!")
+        assert(atlas.height != 0, "This shouldn't be 0!")
+
 	all_entries: [dynamic]rl.Image // it's fine to store it like this, rl.Image just stores a pointer to the data
 	{
 		for entry in entries {
