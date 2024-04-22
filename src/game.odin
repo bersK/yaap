@@ -202,7 +202,7 @@ draw_atlas_settings_and_preview :: proc() {
 					height = small_offset,
 				},
 				"  Enable padding",
-				&g_mem.packer_settings.fix_pixel_bleeding,
+				&g_mem.packer_settings.padding_enabled,
 			)
 			elements_height += small_offset * 2
 

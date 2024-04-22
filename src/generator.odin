@@ -114,8 +114,8 @@ pack_atlas_entries :: proc(entries: []AtlasEntry, atlas: ^rl.Image, offset_x: i3
 
 	for entry, entryIdx in all_entries {
 		entry_stb_rect := &rects[entryIdx]
-		entry_stb_rect.w = stbrp.Coord(entry.width + offset_x * 2)
-		entry_stb_rect.h = stbrp.Coord(entry.height + offset_y * 2)
+		entry_stb_rect.w = stbrp.Coord(entry.width + offset_x)
+		entry_stb_rect.h = stbrp.Coord(entry.height + offset_y)
 	}
 
 	ctx: stbrp.Context
