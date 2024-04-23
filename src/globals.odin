@@ -34,7 +34,6 @@ PackerSettings :: struct {
 	pixel_padding_x_int: i32,
 	pixel_padding_y_int: i32,
 	padding_enabled:     bool,
-	fix_pixel_bleeding:  bool,
 	output_json:         bool,
 	output_odin:         bool,
 }

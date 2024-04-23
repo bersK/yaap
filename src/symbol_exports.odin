@@ -13,7 +13,6 @@ game_update :: proc() -> bool {
 game_init_window :: proc() {
 	rl.SetConfigFlags({.WINDOW_RESIZABLE})
 	rl.InitWindow(1400, 800, "YAAP - Yet Another Atlas Packer")
-	rl.SetWindowPosition(200, 200)
 	rl.SetWindowMinSize(1400, 800)
 }
 

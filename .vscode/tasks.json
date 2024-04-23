@@ -70,7 +70,7 @@
                         },
                         "group": {
                                 "kind": "build",
-                                "isDefault": true
+                                "isDefault": false
                         },
                 },
                 {
@@ -92,7 +92,7 @@
                         },
                         "group": {
                                 "kind": "build",
-                                "isDefault": false
+                                "isDefault": true
                         },
                 }
         ]

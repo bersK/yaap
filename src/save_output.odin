@@ -22,5 +22,7 @@ save_output :: proc() {
 		output_path := strings.concatenate({output_path, atlas_path})
 		cstring_output_path := strings.clone_to_cstring(output_path)
 		rl.ExportImage(image, cstring_output_path)
-	}
+	} else {
+                fmt.println("Output path is empty!")
+        }
 }
