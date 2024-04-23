@@ -25,7 +25,7 @@ FileDialogType :: enum {
 	SourceFiles,
 	SourceFolder,
 	OutputFolder,
-	Exit,
+	SaveFileAs,
 }
 
 PackerSettings :: struct {
@@ -46,14 +46,11 @@ GameMemory :: struct {
 	window_info:                    WindowInformation,
 	monitor_info:                   MonitorInformation,
 	// Where the output files will be written (atlas.png, json output, etc)
-	output_path_set:                bool,
-	output_folder_path:             string,
+	output_folder_path:             Maybe(string),
 	// If files were chosen as input - their paths
-	input_path_set:                 bool,
-	source_location_to_pack:        string,
+	source_location_to_pack:        Maybe(string),
 	// If a folder was chosen as input - the path
-	input_files_set:                bool,
-	source_files_to_pack:           []string,
+	source_files_to_pack:           Maybe([]string),
 	// What type of file dialog to open
 	source_location_type:           FileDialogType,
 	// Packer settings

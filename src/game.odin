@@ -45,7 +45,7 @@ update :: proc() {
 	rl.SetMouseScale(1 / scaling, 1 / scaling)
 
 	if g_mem.should_open_file_dialog {
-		open_file_dialog_and_store_output_paths()
+		open_file_dialog()
 	}
 }
 
@@ -80,10 +80,8 @@ draw_screen_target :: proc() {
 	atlas_entries: [dynamic]AtlasEntry
 	delete(atlas_entries)
 
-	if g_mem.input_path_set {
-		unmarshall_aseprite_dir(g_mem.output_folder_path, &atlas_entries)
-	} else if g_mem.input_files_set {
-		unmarshall_aseprite_files(g_mem.source_files_to_pack, &atlas_entries)
+	if files, ok := g_mem.source_files_to_pack.([]string); ok {
+		unmarshall_aseprite_files(files, &atlas_entries)
 	} else {
 		fmt.println("No source folder or files set! Can't pack the void!!!")
 		g_mem.should_render_atlas = false
@@ -102,7 +100,7 @@ draw_screen_target :: proc() {
 	// OpenGL's Y buffer is flipped
 	rl.ImageFlipVertical(&atlas)
 	// rl.UnloadTexture(atlas_render_target.texture)
-        fmt.println("Packed everything!")
+	fmt.println("Packed everything!")
 	atlas_render_target.texture = rl.LoadTextureFromImage(atlas)
 
 	g_mem.should_render_atlas = false
@@ -410,9 +408,12 @@ draw_atlas_settings_and_preview :: proc() {
 	}
 }
 
-open_file_dialog_and_store_output_paths :: proc() {
-	if g_mem.source_location_type == .SourceFiles {
-		files := cstring(
+open_file_dialog :: proc() {
+	switch g_mem.source_location_type {
+	case .SourceFiles:
+		// `open_file_dialog` returns a single cstring with one or more paths, divided by a separator ('|'),
+		// https://github.com/native-toolkit/libtinyfiledialogs/blob/master/tinyfiledialogs.c#L2706
+		file_paths_conc := cstring(
 			diag.open_file_dialog(
 				"Select source files",
 				cstring(&g_mem.file_dialog_text_buffer[0]),
@@ -422,37 +423,69 @@ open_file_dialog_and_store_output_paths :: proc() {
 				1,
 			),
 		)
+		if len(file_paths_conc) > 0 {
+			// todo(stefan): Currently we're not doing any checks if the filepaths are valid at all,
+			// this should be fine because it's returned by the OS' file picker but who knows...
+			source_files_to_pack := strings.clone_from_cstring(file_paths_conc, context.allocator)
+			g_mem.source_files_to_pack = strings.split(source_files_to_pack, "|")
 
-		source_files_to_pack := strings.clone_from_cstring(files, context.allocator)
-		// File dialog returns an array of path(s), separated by a '|'
-		g_mem.source_files_to_pack = strings.split(source_files_to_pack, "|")
-		g_mem.input_files_set = (len(source_files_to_pack) > 0)
+			fmt.println(g_mem.source_files_to_pack)
+		} else {
+			fmt.println("No files were selected!")
+		}
 
-		fmt.println(g_mem.source_files_to_pack)
-	}
-	if g_mem.source_location_type == .SourceFolder {
+	case .SourceFolder:
 		file := cstring(
 			diag.select_folder_dialog(
 				"Select source folder",
 				cstring(&g_mem.file_dialog_text_buffer[0]),
 			),
 		)
-		g_mem.source_location_to_pack = strings.clone_from_cstring(file)
-		g_mem.input_path_set = (len(file) > 0)
-		fmt.println(g_mem.source_location_to_pack)
-	}
-	if g_mem.source_location_type == .OutputFolder {
+		if len(file) > 0 {
+			g_mem.source_location_to_pack = strings.clone_from_cstring(file)
+			fmt.println(g_mem.source_location_to_pack)
+		} else {
+			fmt.println("Got an empty path from the file dialog!")
+		}
+
+
+	case .OutputFolder:
 		file := cstring(
 			diag.select_folder_dialog(
 				"Select source folder",
 				cstring(&g_mem.file_dialog_text_buffer[0]),
 			),
 		)
-		g_mem.output_folder_path = strings.clone_from_cstring(file)
+		if len(file) > 0 {
+			g_mem.output_folder_path = strings.clone_from_cstring(file)
+			fmt.println(g_mem.output_folder_path)
+		} else {
+			fmt.println("Got an empty path from the file dialog!")
+		}
 
-		g_mem.output_path_set = (len(file) > 0)
-		fmt.println(g_mem.output_folder_path)
+	case .SaveFileAs:
+		file_path: cstring
+		patterns: []cstring = {"*.png"}
+		if default_path, ok := g_mem.output_folder_path.(string); ok {
+			default_path_filename := strings.concatenate({default_path, atlas_path})
+			default_path_to_save: cstring = strings.clone_to_cstring(default_path_filename)
+			file_path = cstring(
+				diag.save_file_dialog(
+					"Save as...",
+					default_path_to_save,
+					1,
+					&patterns[0],
+					"Atlas",
+				),
+			)
+		} else {
+			file_path = cstring(diag.save_file_dialog("Save as...", "", 1, &patterns[0], "Atlas"))
+		}
+		if file_path != nil {
+			save_output()
+		}
 	}
+
 
 	g_mem.should_open_file_dialog = false
 }
