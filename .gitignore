@@ -17,3 +17,6 @@ build/
 build_generator/
 ols.json
 libtinyfiledialogs.a
+libtinyfiledialogs.obj
+tinyfiledialogs.lib
+tinyfiledialogs.obj
