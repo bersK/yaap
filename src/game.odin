@@ -448,7 +448,6 @@ open_file_dialog :: proc() {
 			fmt.println("Got an empty path from the file dialog!")
 		}
 
-
 	case .OutputFolder:
 		file := cstring(
 			diag.select_folder_dialog(

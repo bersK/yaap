@@ -1,6 +1,6 @@
 // generic odin helpers
 
-package game
+package utils
 
 import "core:intrinsics"
 import "core:reflect"
@@ -38,4 +38,11 @@ remap :: proc "contextless" (
 		return new_range / 2
 	}
 	return clamp(((old_value - old_min) / old_range) * new_range + new_min, new_min, new_max)
+}
+
+Vec2i :: [2]int
+Vec2 :: [2]f32
+
+vec2_from_vec2i :: proc(p: Vec2i) -> Vec2 {
+	return {f32(p.x), f32(p.y)}
 }

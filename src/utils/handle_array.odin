@@ -3,7 +3,7 @@
 // that makes sure you don't get bugs when slots are re-used.
 // Read more about it here: https://floooh.github.io/2018/06/17/handles-vs-pointers.html  */
 
-package game
+package utils
 
 Handle :: struct($T: typeid) {
 	// idx 0 means unused. Note that slot 0 is a dummy slot, it can never be used.

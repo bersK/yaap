@@ -4,7 +4,7 @@
 // `animation_rect` when you wish to know the source rect to use in the texture
 // With the source rect you can run rl.DrawTextureRec to draw the current frame.
 
-package game
+package utils
 
 import "core:log"
 
