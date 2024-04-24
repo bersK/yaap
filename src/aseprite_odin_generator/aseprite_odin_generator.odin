@@ -46,6 +46,9 @@ main :: proc() {
 
 	rl.ExportImage(atlas, EXPORT_PATH)
 
+        // something : string = "hello"
+        // fmt.printf("{1} {2} else", something, 10)
+
 	// TestStruct :: struct {
 	// 	something: struct {
 	// 		name: string,

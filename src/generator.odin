@@ -302,26 +302,26 @@ odin_source_generator_metadata := SourceCodeGeneratorMetadata {
 }
 
 
-// cpp_source_generator_metadata := SourceCodeGeneratorMetadata {
-// 	file_defines = {top = "package atlas_bindings\n\n", bottom = ""},
-// 	custom_data_type =  {
-// 		name = "AtlasRect",
-// 		type_declaration = "%v :: struct {{ x, y, w, h: i32 }}\n\n",
-// 	},
-// 	enum_data =  {
-// 		name = "AtlasEnum",
-// 		begin_line = "%v :: enum {{\n",
-// 		entry_line = "\t%s,\n",
-// 		end_line = "}\n\n",
-// 	},
-// 	array_data =  {
-// 		name = "ATLAS_SPRITES",
-// 		type = "[]AtlasRect",
-// 		begin_line = "%v := %v {{\n",
-// 		entry_line = "\t.%v = {{ x = %v, y = %v, w = %v, h = %v }},\n",
-// 		end_line = "}\n\n",
-// 	},
-// }
+cpp_source_generator_metadata := SourceCodeGeneratorMetadata {
+	file_defines = {top = "#include <iostream>\n\n", bottom = ""},
+	custom_data_type =  {
+		name = "AtlasRect",
+		type_declaration = "struct %v {{\n\tint x;\n\tint y;\n\tint w;\n\tint h;\n}};\n\n",
+	},
+	enum_data =  {
+		name = "AtlasEnum",
+		begin_line = "enum %v {{\n",
+		entry_line = "\t%s,\n",
+		end_line = "\n\tCOUNT\n}\n\n",
+	},
+	array_data =  {
+		name = "ATLAS_SPRITES",
+		type = "AtlasRect[size_t(AtlasEnum::COUNT)-1]",
+		begin_line = "{1} {0} = {{\n",
+		entry_line = "\t{{ {1}, {2}, {3}, {4} }},\n",
+		end_line = "}\n\n",
+	},
+}
 
 /*
         Generates a barebones file with the package name "atlas_bindings",
@@ -419,24 +419,14 @@ metadata_source_code_generate :: proc(
 	{
 		entry: string
 		for cell in metadata {
-			if codegen.lanugage_settings.first_class_enum_arrays {
-				entry = fmt.aprintf(
-					codegen.array_data.entry_line, // "\t.%v = {{ x = %v, y = %v, w = %v, h = %v }},\n",
-					cell.name,
-					cell.location.x,
-					cell.location.y,
-					cell.size.x,
-					cell.size.y,
-				)
-			} else {
-				entry = fmt.aprintf(
-					codegen.array_data.entry_line, // "\t{{ x = %v, y = %v, w = %v, h = %v }},\n",
-					cell.location.x,
-					cell.location.y,
-					cell.size.x,
-					cell.size.y,
-				)
-			}
+			entry = fmt.aprintf(
+				codegen.array_data.entry_line, // "\t.%v = {{ x = %v, y = %v, w = %v, h = %v }},\n",
+				cell.name,
+				cell.location.x,
+				cell.location.y,
+				cell.size.x,
+				cell.size.y,
+			)
 			strings.write_string(&sb, entry)
 		}
 	}
