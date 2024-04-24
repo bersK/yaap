@@ -253,21 +253,24 @@ pack_atlas_entries :: proc(
 }
 
 SourceCodeGeneratorMetadata :: struct {
-	file_defines:     struct {
+	file_defines:      struct {
 		top:    string,
 		bottom: string,
 	},
-	custom_data_type: struct {
+	lanugage_settings: struct {
+		first_class_enum_arrays: bool, // for languages that support creating arrays that contain for each enum value an entry in the enum_data.entry_line: .EnumCase = {array entry}
+	},
+	custom_data_type:  struct {
 		name:             string,
 		type_declaration: string, // contains one param: custom_data_type.name + the rest of the type declaration like braces of the syntax & the type members
 	},
-	enum_data:        struct {
+	enum_data:         struct {
 		name:       string,
 		begin_line: string, // contains one params: enum_data.name
 		entry_line: string,
 		end_line:   string,
 	},
-	array_data:       struct {
+	array_data:        struct {
 		name:       string,
 		type:       string,
 		begin_line: string, // array begin line contains 2 params in the listed order: array.name, array.type
@@ -295,6 +298,7 @@ odin_source_generator_metadata := SourceCodeGeneratorMetadata {
 		entry_line = "\t.%v = {{ x = %v, y = %v, w = %v, h = %v }},\n",
 		end_line = "}\n\n",
 	},
+	lanugage_settings = {first_class_enum_arrays = true},
 }
 
 
@@ -415,14 +419,24 @@ metadata_source_code_generate :: proc(
 	{
 		entry: string
 		for cell in metadata {
-			entry = fmt.aprintf(
-				codegen.array_data.entry_line, // "\t.%v = {{ x = %v, y = %v, w = %v, h = %v }},\n",
-				cell.name,
-				cell.location.x,
-				cell.location.y,
-				cell.size.x,
-				cell.size.y,
-			)
+			if codegen.lanugage_settings.first_class_enum_arrays {
+				entry = fmt.aprintf(
+					codegen.array_data.entry_line, // "\t.%v = {{ x = %v, y = %v, w = %v, h = %v }},\n",
+					cell.name,
+					cell.location.x,
+					cell.location.y,
+					cell.size.x,
+					cell.size.y,
+				)
+			} else {
+				entry = fmt.aprintf(
+					codegen.array_data.entry_line, // "\t{{ x = %v, y = %v, w = %v, h = %v }},\n",
+					cell.location.x,
+					cell.location.y,
+					cell.size.x,
+					cell.size.y,
+				)
+			}
 			strings.write_string(&sb, entry)
 		}
 	}
