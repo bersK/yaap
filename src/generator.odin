@@ -1,11 +1,10 @@
 package game
 
 import ase "./aseprite"
-import "core:encoding/json"
 import "core:fmt"
-import "core:mem"
 import "core:os"
 import fp "core:path/filepath"
+import "core:slice"
 import "core:strings"
 import rl "vendor:raylib"
 import stbrp "vendor:stb/rect_pack"
@@ -23,13 +22,6 @@ AtlasEntry :: struct {
 	frames:           i32,
 	layer_names:      [dynamic]string,
 	layer_cell_count: [dynamic]i32,
-}
-
-SingleFrameSprite :: distinct rl.Rectangle
-
-AnimatedSprite :: struct {
-	x, y:          i32,
-	width, height: i32,
 }
 
 SpriteAtlasMetadata :: struct {
@@ -89,6 +81,13 @@ unmarshall_aseprite_files :: proc(file_paths: []string, atlas_entries: ^[dynamic
 atlas_entry_from_compressed_cells :: proc(document: ase.Document) -> (atlas_entry: AtlasEntry) {
 	atlas_entry.frames = auto_cast len(document.frames)
 	fmt.println("N Frames: ", len(document.frames))
+        // note(stefan): Since the expected input for the program is multiple files containing a single sprite
+        // it's probably a safe assumption most of the files will be a single layer with 1 or more frames
+        // which means we can first prod the file for information about how many frames are there and
+        // allocate a slice that is going to be [Frames X Layers]CellData.
+        // which would allow us to gain an already sorted list of sprites if we iterate all frames of a single layer
+        // instead of iterating all layers for each frame
+        // might be even quicker to first get that information an allocate at once the amount of cells we need
 	for frame, frameIdx in document.frames {
 		fmt.printfln("Frame_{0} Chunks: ", frameIdx, len(frame.chunks))
 		for chunk in frame.chunks {
@@ -109,14 +108,21 @@ atlas_entry_from_compressed_cells :: proc(document: ase.Document) -> (atlas_entr
 					opacity = cel_chunk.opacity_level,
 					layer_index = cel_chunk.layer_index,
 				}
+
 				append(&atlas_entry.cells, cell)
 			}
+
 			if layer_chunk, ok := chunk.(ase.Layer_Chunk); ok {
 				fmt.println("Layer chunk: ", layer_chunk)
 				append(&atlas_entry.layer_names, layer_chunk.name)
 			}
 		}
 	}
+
+        slice.sort_by(atlas_entry.cells[:], proc(i, j: CellData) -> bool {
+                return i.layer_index < j.layer_index
+        })
+
 	return
 }
 
@@ -210,17 +216,17 @@ pack_atlas_entries :: proc(
 		entry := entry_and_cell.entry
 		cell := entry_and_cell.cell_of_entry
 
-                cell_name : string
-                if entry.layer_cell_count[cell.layer_index] > 1 {
-                        cell_name = fmt.aprintf(
-                                "{0}_%d",
-                                entry.layer_names[cell.layer_index],
-                                cell.frame_index,
-                                allocator,
-                        )
-                } else {
-                        cell_name = entry.layer_names[cell.layer_index]
-                }
+		cell_name: string
+		if entry.layer_cell_count[cell.layer_index] > 1 {
+			cell_name = fmt.aprintf(
+				"{0}_%d",
+				entry.layer_names[cell.layer_index],
+				cell.frame_index,
+				allocator,
+			)
+		} else {
+			cell_name = entry.layer_names[cell.layer_index]
+		}
 		cell_metadata := SpriteAtlasMetadata {
 			name     = cell_name,
 			location =  {
@@ -231,5 +237,55 @@ pack_atlas_entries :: proc(
 		}
 		append(&metadata, cell_metadata)
 	}
+
 	return metadata
+}
+
+/*
+        Generates a barebones file with the package name "atlas_bindings",
+        the file contains an array of offsets, indexed by an enum.
+        The enum has unique names
+*/
+generate_odin_enums_and_atlas_offsets_file_sb :: proc(
+	metadata: []SpriteAtlasMetadata,
+	alloc := context.allocator,
+) -> strings.Builder {
+	sb := strings.builder_make(alloc)
+	strings.write_string(&sb, "package atlas_bindings\n\n")
+
+	// Introduce the Rect type
+	strings.write_string(&sb, "AtlasRect :: struct { x, y, w, h: i32 }\n\n")
+	// start enum
+	strings.write_string(&sb, "AtlasSprite :: enum {\n")
+	{
+		for cell in metadata {
+			strings.write_string(&sb, fmt.aprintf("\t%s,\n", cell.name))
+		}
+	}
+	// end enum
+	strings.write_string(&sb, "}\n\n")
+
+	// start offsets array
+	// todo(stefan): the name of the array can be based on the output name?
+	strings.write_string(&sb, "ATLAS_SPRITES := []AtlasRect {\n")
+	{
+		entry: string
+		for cell in metadata {
+			entry = fmt.aprintf(
+				"\t.%v = {{ x = %v, y = %v, w = %v, h = %v }},\n",
+				cell.name,
+				cell.location.x,
+				cell.location.y,
+				cell.size.x,
+				cell.size.y,
+			)
+			strings.write_string(&sb, entry)
+		}
+	}
+	// end offsets array
+	strings.write_string(&sb, "}\n\n")
+
+	fmt.println("\n", strings.to_string(sb))
+
+	return sb
 }

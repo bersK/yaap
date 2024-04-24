@@ -20,3 +20,5 @@ libtinyfiledialogs.a
 libtinyfiledialogs.obj
 tinyfiledialogs.lib
 tinyfiledialogs.obj
+
+.idea/
