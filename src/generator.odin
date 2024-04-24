@@ -30,11 +30,17 @@ SpriteAtlasMetadata :: struct {
 	size:     [2]i32,
 }
 
-unmarshall_aseprite_dir :: proc(path: string, atlas_entries: ^[dynamic]AtlasEntry) {
+unmarshall_aseprite_dir :: proc(
+	path: string,
+	atlas_entries: ^[dynamic]AtlasEntry,
+	alloc := context.allocator,
+) {
+	if len(path) == 0 do return
+
 	if dir_fd, err := os.open(path, os.O_RDONLY); err == os.ERROR_NONE {
 		fis: []os.File_Info
 		if fis, err = os.read_dir(dir_fd, -1); err == os.ERROR_NONE {
-			unmarshall_aseprite_files_file_info(fis, atlas_entries)
+			unmarshall_aseprite_files_file_info(fis, atlas_entries, alloc)
 		}
 	} else {
 		fmt.println("Couldn't open folder: ", path)
@@ -44,30 +50,35 @@ unmarshall_aseprite_dir :: proc(path: string, atlas_entries: ^[dynamic]AtlasEntr
 unmarshall_aseprite_files_file_info :: proc(
 	files: []os.File_Info,
 	atlas_entries: ^[dynamic]AtlasEntry,
+	alloc := context.allocator,
 ) {
 	if len(files) == 0 do return
 
-	paths := make([]string, len(files))
+	paths := make([]string, len(files), alloc)
 	defer delete(paths)
 
 	for f, fi in files {
 		paths[fi] = f.fullpath
 	}
 
-	unmarshall_aseprite_files(paths[:], atlas_entries)
+	unmarshall_aseprite_files(paths[:], atlas_entries, alloc)
 
 }
 
-unmarshall_aseprite_files :: proc(file_paths: []string, atlas_entries: ^[dynamic]AtlasEntry) {
+unmarshall_aseprite_files :: proc(
+	file_paths: []string,
+	atlas_entries: ^[dynamic]AtlasEntry,
+	alloc := context.allocator,
+) {
 	if len(file_paths) == 0 do return
 
 	aseprite_document: ase.Document
 	for file in file_paths {
 		extension := fp.ext(file)
-		if extension != ".aseprite" {continue}
+		if extension != ".aseprite" do continue
 
 		fmt.println("Unmarshalling file: ", file)
-		ase.unmarshal_from_filename(file, &aseprite_document)
+		ase.unmarshal_from_filename(file, &aseprite_document, alloc)
 		atlas_entry := atlas_entry_from_compressed_cells(aseprite_document)
 		atlas_entry.path = file
 
@@ -81,13 +92,13 @@ unmarshall_aseprite_files :: proc(file_paths: []string, atlas_entries: ^[dynamic
 atlas_entry_from_compressed_cells :: proc(document: ase.Document) -> (atlas_entry: AtlasEntry) {
 	atlas_entry.frames = auto_cast len(document.frames)
 	fmt.println("N Frames: ", len(document.frames))
-        // note(stefan): Since the expected input for the program is multiple files containing a single sprite
-        // it's probably a safe assumption most of the files will be a single layer with 1 or more frames
-        // which means we can first prod the file for information about how many frames are there and
-        // allocate a slice that is going to be [Frames X Layers]CellData.
-        // which would allow us to gain an already sorted list of sprites if we iterate all frames of a single layer
-        // instead of iterating all layers for each frame
-        // might be even quicker to first get that information an allocate at once the amount of cells we need
+	// note(stefan): Since the expected input for the program is multiple files containing a single sprite
+	// it's probably a safe assumption most of the files will be a single layer with 1 or more frames
+	// which means we can first prod the file for information about how many frames are there and
+	// allocate a slice that is going to be [Frames X Layers]CellData.
+	// which would allow us to gain an already sorted list of sprites if we iterate all frames of a single layer
+	// instead of iterating all layers for each frame
+	// might be even quicker to first get that information an allocate at once the amount of cells we need
 	for frame, frameIdx in document.frames {
 		fmt.printfln("Frame_{0} Chunks: ", frameIdx, len(frame.chunks))
 		for chunk in frame.chunks {
@@ -119,9 +130,9 @@ atlas_entry_from_compressed_cells :: proc(document: ase.Document) -> (atlas_entr
 		}
 	}
 
-        slice.sort_by(atlas_entry.cells[:], proc(i, j: CellData) -> bool {
-                return i.layer_index < j.layer_index
-        })
+	slice.sort_by(atlas_entry.cells[:], proc(i, j: CellData) -> bool {
+		return i.layer_index < j.layer_index
+	})
 
 	return
 }
@@ -241,6 +252,73 @@ pack_atlas_entries :: proc(
 	return metadata
 }
 
+SourceCodeGeneratorMetadata :: struct {
+	file_defines:     struct {
+		top:    string,
+		bottom: string,
+	},
+	custom_data_type: struct {
+		name:             string,
+		type_declaration: string, // contains one param: custom_data_type.name + the rest of the type declaration like braces of the syntax & the type members
+	},
+	enum_data:        struct {
+		name:       string,
+		begin_line: string, // contains one params: enum_data.name
+		entry_line: string,
+		end_line:   string,
+	},
+	array_data:       struct {
+		name:       string,
+		type:       string,
+		begin_line: string, // array begin line contains 2 params in the listed order: array.name, array.type
+		entry_line: string, // array entry contains 5 params in the listed order: cell.name, cell.location.x, cell.location.y, cell.size.x, cell.size.y,
+		end_line:   string,
+	},
+}
+
+odin_source_generator_metadata := SourceCodeGeneratorMetadata {
+	file_defines = {top = "package atlas_bindings\n\n", bottom = ""},
+	custom_data_type =  {
+		name = "AtlasRect",
+		type_declaration = "%v :: struct {{ x, y, w, h: i32 }}\n\n",
+	},
+	enum_data =  {
+		name = "AtlasEnum",
+		begin_line = "%v :: enum {{\n",
+		entry_line = "\t%s,\n",
+		end_line = "}\n\n",
+	},
+	array_data =  {
+		name = "ATLAS_SPRITES",
+		type = "[]AtlasRect",
+		begin_line = "%v := %v {{\n",
+		entry_line = "\t.%v = {{ x = %v, y = %v, w = %v, h = %v }},\n",
+		end_line = "}\n\n",
+	},
+}
+
+
+// cpp_source_generator_metadata := SourceCodeGeneratorMetadata {
+// 	file_defines = {top = "package atlas_bindings\n\n", bottom = ""},
+// 	custom_data_type =  {
+// 		name = "AtlasRect",
+// 		type_declaration = "%v :: struct {{ x, y, w, h: i32 }}\n\n",
+// 	},
+// 	enum_data =  {
+// 		name = "AtlasEnum",
+// 		begin_line = "%v :: enum {{\n",
+// 		entry_line = "\t%s,\n",
+// 		end_line = "}\n\n",
+// 	},
+// 	array_data =  {
+// 		name = "ATLAS_SPRITES",
+// 		type = "[]AtlasRect",
+// 		begin_line = "%v := %v {{\n",
+// 		entry_line = "\t.%v = {{ x = %v, y = %v, w = %v, h = %v }},\n",
+// 		end_line = "}\n\n",
+// 	},
+// }
+
 /*
         Generates a barebones file with the package name "atlas_bindings",
         the file contains an array of offsets, indexed by an enum.
@@ -288,4 +366,74 @@ generate_odin_enums_and_atlas_offsets_file_sb :: proc(
 	fmt.println("\n", strings.to_string(sb))
 
 	return sb
+}
+
+metadata_source_code_generate :: proc(
+	metadata: []SpriteAtlasMetadata,
+	code_generation_metadata: Maybe(SourceCodeGeneratorMetadata),
+	alloc := context.allocator,
+) -> strings.Builder {
+	codegen, ok := code_generation_metadata.(SourceCodeGeneratorMetadata)
+
+	if !ok {
+		return generate_odin_enums_and_atlas_offsets_file_sb(metadata, alloc)
+	}
+
+	sb := strings.builder_make(alloc)
+	// strings.write_string(&sb, "package atlas_bindings\n\n")
+	strings.write_string(&sb, codegen.file_defines.top)
+
+	// Introduce the Rect type
+	// strings.write_string(&sb, "AtlasRect :: struct { x, y, w, h: i32 }\n\n")
+	strings.write_string(
+		&sb,
+		fmt.aprintf(codegen.custom_data_type.type_declaration, codegen.custom_data_type.name),
+	)
+	// start enum
+	// strings.write_string(&sb, "AtlasSprite :: enum {\n")
+	strings.write_string(&sb, fmt.aprintf(codegen.enum_data.begin_line, codegen.enum_data.name))
+	{
+		for cell in metadata {
+			// strings.write_string(&sb, fmt.aprintf("\t%s,\n", cell.name))
+			strings.write_string(&sb, fmt.aprintf(codegen.enum_data.entry_line, cell.name))
+		}
+	}
+	// end enum
+	// strings.write_string(&sb, "}\n\n")
+	strings.write_string(&sb, codegen.enum_data.end_line)
+
+	// start offsets array
+	// strings.write_string(&sb, "ATLAS_SPRITES := []AtlasRect {\n")
+	strings.write_string(
+		&sb,
+		fmt.aprintf(
+			codegen.array_data.begin_line,
+			codegen.array_data.name,
+			codegen.array_data.type,
+		),
+	)
+	{
+		entry: string
+		for cell in metadata {
+			entry = fmt.aprintf(
+				codegen.array_data.entry_line, // "\t.%v = {{ x = %v, y = %v, w = %v, h = %v }},\n",
+				cell.name,
+				cell.location.x,
+				cell.location.y,
+				cell.size.x,
+				cell.size.y,
+			)
+			strings.write_string(&sb, entry)
+		}
+	}
+	// end offsets array
+	// strings.write_string(&sb, "}\n\n")
+	strings.write_string(&sb, codegen.array_data.end_line)
+
+	strings.write_string(&sb, codegen.file_defines.bottom)
+
+	fmt.println("\n", strings.to_string(sb))
+
+	return sb
+
 }

@@ -59,4 +59,5 @@ GameMemory :: struct {
 	should_render_atlas:            bool,
 	atlas_render_has_preview:       bool,
 	atlas_render_size:              i32,
+	atlas_metadata:                 Maybe([dynamic]SpriteAtlasMetadata),
 }

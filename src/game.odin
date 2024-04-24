@@ -95,7 +95,8 @@ draw_screen_target :: proc() {
 		g_mem.packer_settings.pixel_padding_x_int if g_mem.packer_settings.padding_enabled else 0
 	padding_y :=
 		g_mem.packer_settings.pixel_padding_y_int if g_mem.packer_settings.padding_enabled else 0
-	pack_atlas_entries(atlas_entries[:], &atlas, padding_x, padding_y)
+
+	g_mem.atlas_metadata = pack_atlas_entries(atlas_entries[:], &atlas, padding_x, padding_y)
 
 	// OpenGL's Y buffer is flipped
 	rl.ImageFlipVertical(&atlas)
@@ -320,7 +321,7 @@ draw_atlas_settings_and_preview :: proc() {
 				   },
 				   "Clear Atlas",
 			   ) {
-				g_mem.atlas_render_has_preview = false
+				clear_atlas_data()
 			}
 			elements_height += small_offset * 2
 
@@ -466,7 +467,7 @@ open_file_dialog :: proc() {
 		file_path: cstring
 		patterns: []cstring = {"*.png"}
 		if default_path, ok := g_mem.output_folder_path.(string); ok {
-			default_path_filename := strings.concatenate({default_path, atlas_path})
+			default_path_filename := strings.concatenate({default_path, os_file_separator, "atlas.png"})
 			default_path_to_save: cstring = strings.clone_to_cstring(default_path_filename)
 			file_path = cstring(
 				diag.save_file_dialog(
@@ -487,4 +488,12 @@ open_file_dialog :: proc() {
 
 
 	g_mem.should_open_file_dialog = false
+}
+
+clear_atlas_data :: proc() {
+        if metadata, ok := g_mem.atlas_metadata.([dynamic]SpriteAtlasMetadata); ok {
+                delete(metadata)
+                // g_mem.atlas_metadata = nil
+        }
+	g_mem.atlas_render_has_preview = false
 }
