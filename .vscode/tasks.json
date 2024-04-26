@@ -77,7 +77,7 @@
                         "label": "Build&Run Atlas Generator Test",
                         "type": "shell",
                         "windows": {
-                                "command": "${workspaceFolder}/scripts/build_generator_debug.bat && build_generator\\aseprite_odin_generator.exe",
+                                "command": "${workspaceFolder}/scripts/build_generator_debug.bat && build_generator\\aseprite_odin_generator.exe -input-files:value_of_custom_arg -h",
                         },
                         "options": {
                                 "cwd": "${workspaceFolder}"

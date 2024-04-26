@@ -14,13 +14,25 @@ import rl "vendor:raylib"
 import stbrp "vendor:stb/rect_pack"
 
 import gen ".."
+import utils "../utils"
 
 ATLAS_SIZE :: 512
 IMPORT_PATH :: "./src/aseprite_odin_generator/big.aseprite"
 EXPORT_PATH :: "./src/aseprite_odin_generator/atlas.png"
 
 main :: proc() {
-	fmt.println("Hello!")
+	args := utils.parse_arguments(os.args[1:])
+	fmt.println(args)
+
+	if ok := utils.CLIFlagType.Help in args; ok {
+		fmt.println("Help called!")
+		utils.print_help()
+		return
+	}
+	// if help, ok: args[utils.CLIFlagType.Help]; ok {
+	// 	fmt.println("Help called!")
+	// }
+
 	ase_file, ase_ok := os.read_entire_file(IMPORT_PATH)
 	if !ase_ok {
 		fmt.panicf("Couldn't load file!")
@@ -45,20 +57,4 @@ main :: proc() {
 	)
 
 	rl.ExportImage(atlas, EXPORT_PATH)
-
-        // something : string = "hello"
-        // fmt.printf("{1} {2} else", something, 10)
-
-	// TestStruct :: struct {
-	// 	something: struct {
-	// 		name: string,
-	// 		age:  int,
-	// 	},
-	// }
-        // ts: TestStruct
-        // ts.something.name = "name"
-
-        // jb, err := json.marshal(ts)
-        // sjb := transmute(string)jb
-        // fmt.println(sjb)
 }

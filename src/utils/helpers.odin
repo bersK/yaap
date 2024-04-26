@@ -5,6 +5,13 @@ package utils
 import "core:intrinsics"
 import "core:reflect"
 import "core:strings"
+import rl "vendor:raylib"
+
+Texture :: rl.Texture
+Color :: rl.Color
+
+Rect :: rl.Rectangle
+RectEmpty :: Rect{}
 
 increase_or_wrap_enum :: proc(e: $T) -> T {
 	ei := int(e) + 1
