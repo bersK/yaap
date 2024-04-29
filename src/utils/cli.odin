@@ -33,10 +33,30 @@ CLI_FLAG_DESCRIPTIONS := [CLIFlagType]string {
 	.InputFiles                     = "(real) path the source files for the packer (realpaths only), for multiple files you can provide one string of concateneted paths, separated by a ';'",
 	.InputFolder                    = "(real) path to a folder full of source files. This is an alternative to the -i[,input-files] flag",
 	.OutputFolder                   = "(real) path to the output folder for all the resulting files to be saved to.",
-	.EnableMetadataOutput           = "On by default. Whether or not to export metadata (JSON or source files with the offsets for the packer sprites in the atlas)",
+	.EnableMetadataOutput           = "Whether or not to export metadata (JSON or source files with the offsets for the packer sprites in the atlas)",
 	.ConfigPath                     = "(real) path to a config file (json) that contains string definitions for exporting custom source files. More on this in the docs.",
 	.MetadataJSONOutputPath         = "(real) path for the resulting JSON that will be generated for the atlas. It overrides the name & location in regards to the -o[,output-folder] flag",
 	.SourceCodeOutputPathOutputPath = "(real) path for the resulting source code file that will be generated for the atlas. It overrides the name & location in regards to the -o[,output-folder] flag",
+}
+
+CLIOutputSettings :: struct {
+	// Where the output files will be written (atlas.png, json output, etc)
+	output_folder_path:      Maybe(string),
+	// If files were chosen as input - their paths
+	source_location_to_pack: Maybe(string),
+	// If a folder was chosen as input - the path
+	source_files_to_pack:    Maybe([]string),
+}
+
+CLIMetadataSettings :: struct {
+	json_path:        Maybe(string),
+	source_code_path: Maybe(string),
+}
+
+CLIPackerSettings :: struct {
+	output:           Maybe(CLIOutputSettings),
+	metadata:         Maybe(CLIMetadataSettings),
+	json_config_path: Maybe(string),
 }
 
 CLIFlag :: struct {

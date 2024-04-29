@@ -29,9 +29,6 @@ main :: proc() {
 		utils.print_help()
 		return
 	}
-	// if help, ok: args[utils.CLIFlagType.Help]; ok {
-	// 	fmt.println("Help called!")
-	// }
 
 	ase_file, ase_ok := os.read_entire_file(IMPORT_PATH)
 	if !ase_ok {

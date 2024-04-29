@@ -1,6 +1,7 @@
 package game
 
 import ase "./aseprite"
+import "core:encoding/json"
 import "core:fmt"
 import "core:os"
 import fp "core:path/filepath"
@@ -8,6 +9,15 @@ import "core:slice"
 import "core:strings"
 import rl "vendor:raylib"
 import stbrp "vendor:stb/rect_pack"
+
+import utils "./utils"
+
+when ODIN_OS == .Windows {
+	os_file_separator :: "\\"
+} else {
+	os_file_separator :: "/"
+}
+
 
 CellData :: struct {
 	layer_index: u16,
@@ -439,5 +449,70 @@ metadata_source_code_generate :: proc(
 	fmt.println("\n", strings.to_string(sb))
 
 	return sb
+
+}
+
+save_metadata :: proc(
+	settings: utils.CLIPackerSettings,
+	atlas_entries: []AtlasEntry,
+	atlas_metadata: []SpriteAtlasMetadata,
+) {
+	metadata, ok := settings.metadata.(utils.CLIMetadataSettings);if !ok do return
+
+	if json_path, ok := metadata.json_path.(string); ok {
+		json_bytes, jerr := json.marshal(atlas_metadata)
+		if jerr == nil {
+			os.write_entire_file(json_path, json_bytes)
+		} else {
+			fmt.println("Failed to marshall metadata")
+		}
+	}
+	if source_code_path, ok := metadata.source_code_path.(string); ok {
+		sb := metadata_source_code_generate(atlas_metadata, odin_source_generator_metadata)
+		source_code_output_str := strings.to_string(sb)
+		os.write_entire_file(source_code_path, transmute([]byte)source_code_output_str)
+	}
+}
+
+save_output :: proc() {
+	output_path, ok := g_mem.output_folder_path.(string)
+	if !ok {
+		fmt.println("Output path is empty!")
+		return
+	} else if output_path == "" {
+		fmt.println("Output path is empty!")
+		return
+	}
+
+	image := rl.LoadImageFromTexture(g_mem.atlas_render_texture_target.texture)
+	rl.ImageFlipVertical(&image)
+
+	output_path = strings.concatenate({output_path, os_file_separator, "atlas.png"})
+	cstring_output_path := strings.clone_to_cstring(output_path)
+
+	rl.ExportImage(image, cstring_output_path)
+
+	if metadata, ok := g_mem.atlas_metadata.([dynamic]SpriteAtlasMetadata); ok {
+		if json_metadata, jok := json.marshal(metadata); jok == nil {
+			os.write_entire_file(
+				strings.concatenate({output_path, os_file_separator, "metadata.json"}),
+				json_metadata,
+			)
+		} else {
+			fmt.println("Failed to marshall the atlas metadata to a json!")
+		}
+
+		// TODO(stefan): Think of a more generic alternative to just straight output to a odin file
+		// maybe supply a config.json that defines the start, end, line by line entry and enum format strings
+		// this way you can essentially support any language
+		sb := generate_odin_enums_and_atlas_offsets_file_sb(metadata[:])
+		odin_metadata := strings.to_string(sb)
+		os.write_entire_file(
+			strings.concatenate({output_path, os_file_separator, "metadata.odin"}),
+			transmute([]byte)odin_metadata,
+		)
+	} else {
+		fmt.println("No metadata to export!")
+	}
 
 }
